@@ -158,11 +158,28 @@ class Selection {
 
   getNativeRange() {
     let selection = document.getSelection();
-    if (selection == null || selection.rangeCount <= 0) return null;
+    console.groupCollapsed('getNativeRange()');
+    console.log('selection: ', selection);
+
+    if (selection == null || selection.rangeCount <= 0) {
+      console.log('selection == null || selction.rangeCount <= 0, returning null');
+      console.groupEnd();
+
+      return null;
+    }
     let nativeRange = selection.getRangeAt(0);
-    if (nativeRange == null) return null;
+    if (nativeRange == null) {
+      console.log('nativeRange == null, returning null');
+      console.groupEnd();
+
+      return null;
+    }
     let range = this.normalizeNative(nativeRange);
     debug.info('getNativeRange', range);
+    console.log('returning normalizeNative result: ', range);
+    console.log('returning normalizeNative result, start: ', range && range.start);
+    console.log('returning normalizeNative result, end: ', range && range.end);
+    console.groupEnd();
     return range;
   }
 
@@ -174,32 +191,63 @@ class Selection {
   }
 
   hasFocus() {
-    return document.activeElement === this.root;
+    return document.activeElement === this.root || contains(this.root, document.activeElement);
   }
 
   normalizedToRange(range) {
+    console.groupCollapsed('normalizedToRange()');
+
     let positions = [[range.start.node, range.start.offset]];
     if (!range.native.collapsed) {
       positions.push([range.end.node, range.end.offset]);
     }
-    let indexes = positions.map((position) => {
+    console.log('positions: ', positions);
+    let indexes = positions.map((position, i) => {
+      console.groupCollapsed(`positions.map, iteration ${i}`);
       let [node, offset] = position;
+      console.log('node: ', node);
       let blot = Parchment.find(node, true);
+      console.log('blot: ', blot);
       let index = blot.offset(this.scroll);
+      console.log('index: ', index);
+
+      if (blot instanceof Parchment.Leaf) {
+        console.log('blot instanceof Parchment.Leaf, returning index + blot.index(node, offset): ', index + blot.index(node, offset));
+        console.groupEnd();
+        return index + blot.index(node, offset);
+      }
+
       if (offset === 0) {
+        console.log('offset === 0, returning `index`: ', index);
+        console.groupEnd();
         return index;
       } else if (blot instanceof Parchment.Container) {
+        console.log('blot instanceof Parchment.Container, returning `index + blot.length()`: ', index + blot.length());
+        console.groupEnd();
         return index + blot.length();
       } else {
+        console.log('else, returning `index + blot.index(node, offset)`: ', index + blot.index(node, offset));
+        console.groupEnd();
         return index + blot.index(node, offset);
       }
     });
     let end = Math.min(Math.max(...indexes), this.scroll.length() - 1);
     let start = Math.min(end, ...indexes);
+
+    console.log('end: ', end);
+    console.log('start: ', start);
+    console.groupEnd();
     return new Range(start, end-start);
   }
 
   normalizeNative(nativeRange) {
+    console.groupCollapsed('Selection#normalizeNative()');
+    console.log('args, nativeRange: ', nativeRange);
+    console.log('args, nativeRange.startContainer: ', nativeRange.startContainer);
+    console.groupCollapsed('trace');
+    console.trace();
+    console.groupEnd();
+    console.groupEnd();
     if (!contains(this.root, nativeRange.startContainer) ||
         (!nativeRange.collapsed && !contains(this.root, nativeRange.endContainer))) {
       return null;
@@ -231,15 +279,23 @@ class Selection {
     let indexes = range.collapsed ? [range.index] : [range.index, range.index + range.length];
     let args = [];
     let scrollLength = this.scroll.length();
+    console.groupCollapsed('Selection#rangeToNative()');
     indexes.forEach((index, i) => {
       index = Math.min(scrollLength - 1, index);
       let node, [leaf, offset] = this.scroll.leaf(index);
+      console.groupCollapsed(`##indexes.forEach, iter ${i}`);
+      console.log('leaf: ', leaf);
+      console.log('offset: ', offset);
+      console.log('i !== 0: ', i !== 0);
+      console.groupEnd();
       [node, offset] = leaf.position(offset, i !== 0);
       args.push(node, offset);
     });
     if (args.length < 2) {
       args = args.concat(args);
     }
+    console.log('returning args: ', args);
+    console.groupEnd();
     return args;
   }
 
@@ -268,16 +324,22 @@ class Selection {
     if (startNode != null && (this.root.parentNode == null || startNode.parentNode == null || endNode.parentNode == null)) {
       return;
     }
+    console.groupCollapsed('Selection#setNativeRange()');
     let selection = document.getSelection();
-    if (selection == null) return;
+    if (selection == null) {
+      console.groupEnd();
+      return;
+    }
     if (startNode != null) {
       if (!this.hasFocus()) this.root.focus();
       let native = (this.getNativeRange() || {}).native;
+      console.log('native: ', native);
       if (native == null || force ||
-          startNode !== native.startContainer ||
-          startOffset !== native.startOffset ||
-          endNode !== native.endContainer ||
-          endOffset !== native.endOffset) {
+        startNode !== native.startContainer ||
+        startOffset !== native.startOffset ||
+        endNode !== native.endContainer ||
+        endOffset !== native.endOffset) {
+        console.log('startNode: ', startNode);
 
         if (startNode.tagName == "BR") {
           startOffset = [].indexOf.call(startNode.parentNode.childNodes, startNode);
@@ -290,6 +352,7 @@ class Selection {
         let range = document.createRange();
         range.setStart(startNode, startOffset);
         range.setEnd(endNode, endOffset);
+        console.log('new range to set: ', range);
         selection.removeAllRanges();
         selection.addRange(range);
       }
@@ -298,6 +361,7 @@ class Selection {
       this.root.blur();
       document.body.focus();  // root.blur() not enough on IE11+Travis+SauceLabs (but not local VMs)
     }
+    console.groupEnd();
   }
 
   setRange(range, force = false, source = Emitter.sources.API) {
@@ -317,21 +381,39 @@ class Selection {
 
   update(source = Emitter.sources.USER) {
     let oldRange = this.lastRange;
+    console.groupCollapsed('[QUILL]Selection#update()');
+    console.log('old range: ', oldRange);
+
+    console.groupCollapsed('trace');
+    console.trace();
+    console.groupEnd();
+
     let [lastRange, nativeRange] = this.getRange();
     this.lastRange = lastRange;
+
+    console.log('lastRange: ', lastRange);
+    console.log('nativeRange: ', nativeRange);
+
     if (this.lastRange != null) {
       this.savedRange = this.lastRange;
     }
     if (!equal(oldRange, this.lastRange)) {
+      console.log('oldRange !== this.lastRange');
       if (!this.composing && nativeRange != null && nativeRange.native.collapsed && nativeRange.start.node !== this.cursor.textNode) {
+        console.log('first truthy check? about to call this.cursor.restore()');
+        console.groupEnd();
         this.cursor.restore();
       }
       let args = [Emitter.events.SELECTION_CHANGE, clone(this.lastRange), clone(oldRange), source];
       this.emitter.emit(Emitter.events.EDITOR_CHANGE, ...args);
       if (source !== Emitter.sources.SILENT) {
+        console.log('second truthy check? about to call emit()');
+        console.groupEnd();
+
         this.emitter.emit(...args);
       }
     }
+    console.groupEnd();
   }
 }
 

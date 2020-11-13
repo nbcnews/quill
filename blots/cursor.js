@@ -56,6 +56,11 @@ class Cursor extends Parchment.Embed {
   }
 
   restore() {
+    console.groupCollapsed('Cursor#restore()');
+    console.log('this.textNode: ', this.textNode);
+    console.log('this.selection.composing: ', this.selection.composing);
+    console.log('this.parent == null: ', this.parent == null);
+    console.groupEnd();
     if (this.selection.composing || this.parent == null) return;
     let textNode = this.textNode;
     let range = this.selection.getNativeRange();
